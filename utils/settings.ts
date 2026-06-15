@@ -2,6 +2,7 @@ export interface PollSettings {
   enabled: boolean;
   apiUrl: string;
   intervalMinutes: number;
+  refreshToken: string;
 }
 
 export interface PollStatus {
@@ -14,6 +15,7 @@ export const DEFAULT_SETTINGS: PollSettings = {
   enabled: false,
   apiUrl: '',
   intervalMinutes: 1,
+  refreshToken: '',
 };
 
 export const DEFAULT_STATUS: PollStatus = {

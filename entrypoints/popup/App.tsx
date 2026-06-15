@@ -72,6 +72,16 @@ function App() {
       </label>
 
       <label className="field">
+        <span>리프레시 토큰</span>
+        <input
+          type="password"
+          placeholder="리프레시 토큰을 입력하세요"
+          value={settings.refreshToken}
+          onChange={(e) => setSettings({ ...settings, refreshToken: e.target.value })}
+        />
+      </label>
+
+      <label className="field">
         <span>호출 간격 (분)</span>
         <input
           type="number"
