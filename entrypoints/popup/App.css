@@ -116,6 +116,20 @@ button:disabled {
   word-break: break-all;
 }
 
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.switch-row input[type='checkbox'] {
+  width: 2.2rem;
+  height: 1.3rem;
+  cursor: pointer;
+}
+
 .window-info {
   font-size: 0.78rem;
   color: #aaa;

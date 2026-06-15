@@ -1,8 +1,10 @@
 import { browser } from 'wxt/browser';
 import {
+  DEFAULT_MASSAGE_STATUS,
   DEFAULT_STATUS,
   STORAGE_KEYS,
   type AppStatus,
+  type MassageStatus,
   type TokenData,
 } from '@/utils/settings';
 
@@ -10,6 +12,10 @@ const BASE_URL = 'https://prod.flooding.kr';
 const ALARM_NAME = 'study-check';
 const WINDOW_START_MIN = 20 * 60 + 10; // 20:10
 const WINDOW_END_MIN = 21 * 60;        // 21:00
+
+const MASSAGE_HOUR = 20;
+const MASSAGE_MINUTE = 20;
+const MASSAGE_SECOND = 2; // 20:20:02
 
 function nowMinutes(): number {
   const d = new Date();
@@ -50,6 +56,21 @@ async function setStatus(status: AppStatus) {
   await browser.storage.local.set({ [STORAGE_KEYS.status]: status });
 }
 
+async function getMassageStatus(): Promise<MassageStatus> {
+  const stored = await browser.storage.local.get(STORAGE_KEYS.massageStatus);
+  return {
+    ...DEFAULT_MASSAGE_STATUS,
+    ...(stored[STORAGE_KEYS.massageStatus] as Partial<MassageStatus> | undefined),
+  };
+}
+
+async function setMassageStatus(status: Partial<MassageStatus>) {
+  const current = await getMassageStatus();
+  await browser.storage.local.set({
+    [STORAGE_KEYS.massageStatus]: { ...current, ...status },
+  });
+}
+
 async function reissueToken(refreshToken: string): Promise<TokenData | null> {
   const res = await fetch(`${BASE_URL}/auth/reissue`, {
     method: 'POST',
@@ -73,6 +94,15 @@ async function reissueToken(refreshToken: string): Promise<TokenData | null> {
 
 async function requestStudy(accessToken: string): Promise<Response> {
   return fetch(`${BASE_URL}/dormitory/studies`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
+async function requestMassage(accessToken: string): Promise<Response> {
+  return fetch(`${BASE_URL}/dormitory/massages`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -137,6 +167,71 @@ async function checkAndSend(): Promise<void> {
   await sendStudyRequest();
 }
 
+async function sendMassageRequest(): Promise<void> {
+  // Mark today as attempted immediately so this never retries, even on failure.
+  await setMassageStatus({ lastAttemptDate: todayString() });
+
+  const existing = await getTokens();
+  if (!existing?.refreshToken) {
+    await setMassageStatus({
+      lastSentAt: Date.now(),
+      lastResult: 'error',
+      lastMessage: '리프레시 토큰이 없습니다. 팝업에서 입력해주세요.',
+    });
+    return;
+  }
+
+  try {
+    let accessToken = existing.accessToken;
+    let res = accessToken ? await requestMassage(accessToken) : null;
+
+    if (!res || res.status === 401) {
+      const reissued = await reissueToken(existing.refreshToken);
+      if (!reissued) {
+        await setMassageStatus({
+          lastSentAt: Date.now(),
+          lastResult: 'token_expired',
+          lastMessage: '토큰 재발급 실패 (401). 리프레시 토큰을 재입력해주세요.',
+        });
+        return;
+      }
+      accessToken = reissued.accessToken;
+      res = await requestMassage(accessToken);
+    }
+
+    const ok = res.ok || res.status === 201;
+    await setMassageStatus({
+      lastSentAt: Date.now(),
+      lastResult: ok ? 'success' : 'error',
+      lastMessage: `HTTP ${res.status}`,
+    });
+  } catch (err) {
+    await setMassageStatus({
+      lastSentAt: Date.now(),
+      lastResult: 'error',
+      lastMessage: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+async function checkAndSendMassage(): Promise<void> {
+  const status = await getMassageStatus();
+  if (!status.enabled) return;
+  if (status.lastAttemptDate === todayString()) return;
+
+  const now = new Date();
+  if (now.getHours() !== MASSAGE_HOUR || now.getMinutes() !== MASSAGE_MINUTE) return;
+
+  const msUntilTarget =
+    (MASSAGE_SECOND - now.getSeconds()) * 1000 - now.getMilliseconds();
+
+  if (msUntilTarget <= 0) {
+    await sendMassageRequest();
+    return;
+  }
+  setTimeout(() => sendMassageRequest(), msUntilTarget);
+}
+
 function scheduleAlarm() {
   browser.alarms.create(ALARM_NAME, {
     delayInMinutes: 1,
@@ -146,10 +241,14 @@ function scheduleAlarm() {
 
 export default defineBackground(() => {
   checkAndSend();
+  checkAndSendMassage();
   scheduleAlarm();
 
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === ALARM_NAME) checkAndSend();
+    if (alarm.name === ALARM_NAME) {
+      checkAndSend();
+      checkAndSendMassage();
+    }
   });
 
   browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {

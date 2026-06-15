@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import {
+  DEFAULT_MASSAGE_STATUS,
   DEFAULT_STATUS,
   STORAGE_KEYS,
   type AppStatus,
+  type MassageStatus,
   type TokenData,
 } from '@/utils/settings';
 import './App.css';
@@ -32,12 +34,13 @@ function resultLabel(result: AppStatus['lastResult']): string {
 function App() {
   const [refreshToken, setRefreshToken] = useState('');
   const [status, setStatus] = useState<AppStatus>(DEFAULT_STATUS);
+  const [massageStatus, setMassageStatus] = useState<MassageStatus>(DEFAULT_MASSAGE_STATUS);
   const [saved, setSaved] = useState(false);
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
     browser.storage.local
-      .get([STORAGE_KEYS.tokens, STORAGE_KEYS.status])
+      .get([STORAGE_KEYS.tokens, STORAGE_KEYS.status, STORAGE_KEYS.massageStatus])
       .then((stored) => {
         const tokens = stored[STORAGE_KEYS.tokens] as TokenData | undefined;
         if (tokens?.refreshToken) setRefreshToken(tokens.refreshToken);
@@ -46,14 +49,27 @@ function App() {
           ...DEFAULT_STATUS,
           ...(stored[STORAGE_KEYS.status] as Partial<AppStatus> | undefined),
         });
+
+        setMassageStatus({
+          ...DEFAULT_MASSAGE_STATUS,
+          ...(stored[STORAGE_KEYS.massageStatus] as Partial<MassageStatus> | undefined),
+        });
       });
 
     const onChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
-      if (area !== 'local' || !changes[STORAGE_KEYS.status]) return;
-      setStatus({
-        ...DEFAULT_STATUS,
-        ...(changes[STORAGE_KEYS.status].newValue as Partial<AppStatus> | undefined),
-      });
+      if (area !== 'local') return;
+      if (changes[STORAGE_KEYS.status]) {
+        setStatus({
+          ...DEFAULT_STATUS,
+          ...(changes[STORAGE_KEYS.status].newValue as Partial<AppStatus> | undefined),
+        });
+      }
+      if (changes[STORAGE_KEYS.massageStatus]) {
+        setMassageStatus({
+          ...DEFAULT_MASSAGE_STATUS,
+          ...(changes[STORAGE_KEYS.massageStatus].newValue as Partial<MassageStatus> | undefined),
+        });
+      }
     };
     browser.storage.onChanged.addListener(onChanged);
     return () => browser.storage.onChanged.removeListener(onChanged);
@@ -74,6 +90,12 @@ function App() {
       // status updates via storage.onChanged
     }
     setSending(false);
+  };
+
+  const handleToggleMassage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const updated = { ...massageStatus, enabled: e.target.checked };
+    setMassageStatus(updated);
+    await browser.storage.local.set({ [STORAGE_KEYS.massageStatus]: updated });
   };
 
   const sentToday = status.lastSentDate === todayString() && status.lastResult === 'success';
@@ -130,6 +152,30 @@ function App() {
           {inWindow ? '활성' : '대기'}
         </span>
       </div>
+
+      <section className="status">
+        <h2>마사지 자동 전송 (20:20:02)</h2>
+        <label className="switch-row">
+          <span>자동 전송 사용</span>
+          <input
+            type="checkbox"
+            checked={massageStatus.enabled}
+            onChange={handleToggleMassage}
+          />
+        </label>
+        {massageStatus.lastSentAt && (
+          <div>마지막 시도: {new Date(massageStatus.lastSentAt).toLocaleString('ko-KR')}</div>
+        )}
+        {massageStatus.lastResult && (
+          <div>
+            결과:{' '}
+            <span className={`badge ${massageStatus.lastResult}`}>
+              {resultLabel(massageStatus.lastResult)}
+            </span>
+          </div>
+        )}
+        {massageStatus.lastMessage && <div className="msg">{massageStatus.lastMessage}</div>}
+      </section>
     </main>
   );
 }
