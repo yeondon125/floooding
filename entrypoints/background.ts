@@ -71,25 +71,37 @@ async function setMassageStatus(status: Partial<MassageStatus>) {
   });
 }
 
+let reissuePromise: Promise<TokenData | null> | null = null;
+
 async function reissueToken(refreshToken: string): Promise<TokenData | null> {
-  const res = await fetch(`${BASE_URL}/auth/reissue`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  });
+  if (reissuePromise) return reissuePromise;
 
-  if (!res.ok) return null;
+  reissuePromise = (async () => {
+    const res = await fetch(`${BASE_URL}/auth/reissue`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
 
-  const json = await res.json();
-  const tokens: TokenData = {
-    accessToken: json?.data?.accessToken ?? json?.accessToken ?? '',
-    refreshToken: json?.data?.refreshToken ?? json?.refreshToken ?? '',
-  };
+    if (!res.ok) return null;
 
-  if (!tokens.accessToken) return null;
+    const json = await res.json();
+    const tokens: TokenData = {
+      accessToken: json?.data?.accessToken ?? json?.accessToken ?? '',
+      refreshToken: json?.data?.refreshToken ?? json?.refreshToken ?? '',
+    };
 
-  await saveTokens(tokens);
-  return tokens;
+    if (!tokens.accessToken) return null;
+
+    await saveTokens(tokens);
+    return tokens;
+  })();
+
+  try {
+    return await reissuePromise;
+  } finally {
+    reissuePromise = null;
+  }
 }
 
 async function requestStudy(accessToken: string): Promise<Response> {

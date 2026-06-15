@@ -7,5 +7,6 @@ export default defineConfig({
     name: 'Floooding',
     description: '일정 시간마다 자동으로 API를 호출하는 확장 프로그램',
     permissions: ['alarms', 'storage'],
+    host_permissions: ['https://prod.flooding.kr/*'],
   },
 });

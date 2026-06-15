@@ -100,6 +100,7 @@ function App() {
 
   const sentToday = status.lastSentDate === todayString() && status.lastResult === 'success';
   const inWindow = isInWindow();
+  const massageAttemptedToday = massageStatus.lastAttemptDate === todayString();
 
   return (
     <main className="app">
@@ -163,6 +164,24 @@ function App() {
             onChange={handleToggleMassage}
           />
         </label>
+        <div>
+          오늘 전송:{' '}
+          <span
+            className={`badge ${
+              massageAttemptedToday
+                ? massageStatus.lastResult === 'success'
+                  ? 'success'
+                  : 'error'
+                : 'pending'
+            }`}
+          >
+            {massageAttemptedToday
+              ? massageStatus.lastResult === 'success'
+                ? '성공'
+                : '실패'
+              : '미완료'}
+          </span>
+        </div>
         {massageStatus.lastSentAt && (
           <div>마지막 시도: {new Date(massageStatus.lastSentAt).toLocaleString('ko-KR')}</div>
         )}
