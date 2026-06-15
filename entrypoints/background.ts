@@ -71,6 +71,15 @@ async function reissueToken(refreshToken: string): Promise<TokenData | null> {
   return tokens;
 }
 
+async function requestStudy(accessToken: string): Promise<Response> {
+  return fetch(`${BASE_URL}/dormitory/studies`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
 async function sendStudyRequest(manual = false): Promise<void> {
   const existing = await getTokens();
   if (!existing?.refreshToken) {
@@ -83,24 +92,24 @@ async function sendStudyRequest(manual = false): Promise<void> {
     return;
   }
 
-  const tokens = await reissueToken(existing.refreshToken);
-  if (!tokens) {
-    await setStatus({
-      lastSentAt: Date.now(),
-      lastSentDate: manual ? null : null,
-      lastResult: 'token_expired',
-      lastMessage: '토큰 재발급 실패 (401). 리프레시 토큰을 재입력해주세요.',
-    });
-    return;
-  }
-
   try {
-    const res = await fetch(`${BASE_URL}/dormitory/studies`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${tokens.accessToken}`,
-      },
-    });
+    let accessToken = existing.accessToken;
+    let res = accessToken ? await requestStudy(accessToken) : null;
+
+    if (!res || res.status === 401) {
+      const reissued = await reissueToken(existing.refreshToken);
+      if (!reissued) {
+        await setStatus({
+          lastSentAt: Date.now(),
+          lastSentDate: manual ? null : null,
+          lastResult: 'token_expired',
+          lastMessage: '토큰 재발급 실패 (401). 리프레시 토큰을 재입력해주세요.',
+        });
+        return;
+      }
+      accessToken = reissued.accessToken;
+      res = await requestStudy(accessToken);
+    }
 
     const ok = res.ok || res.status === 201;
     await setStatus({
