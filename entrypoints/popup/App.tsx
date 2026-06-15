@@ -1,41 +1,58 @@
 import { useEffect, useState } from 'react';
 import { browser } from 'wxt/browser';
 import {
-  DEFAULT_SETTINGS,
   DEFAULT_STATUS,
   STORAGE_KEYS,
-  type PollSettings,
-  type PollStatus,
+  type AppStatus,
+  type TokenData,
 } from '@/utils/settings';
 import './App.css';
 
+function todayString(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isInWindow(): boolean {
+  const d = new Date();
+  const total = d.getHours() * 60 + d.getMinutes();
+  return total >= 20 * 60 + 10 && total < 21 * 60;
+}
+
+function resultLabel(result: AppStatus['lastResult']): string {
+  if (!result) return '-';
+  if (result === 'success') return '성공';
+  if (result === 'token_expired') return '토큰 만료';
+  return '오류';
+}
+
 function App() {
-  const [settings, setSettings] = useState<PollSettings>(DEFAULT_SETTINGS);
-  const [status, setStatus] = useState<PollStatus>(DEFAULT_STATUS);
+  const [refreshToken, setRefreshToken] = useState('');
+  const [status, setStatus] = useState<AppStatus>(DEFAULT_STATUS);
   const [saved, setSaved] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     browser.storage.local
-      .get([STORAGE_KEYS.settings, STORAGE_KEYS.status])
+      .get([STORAGE_KEYS.tokens, STORAGE_KEYS.status])
       .then((stored) => {
-        setSettings({
-          ...DEFAULT_SETTINGS,
-          ...(stored[STORAGE_KEYS.settings] as Partial<PollSettings> | undefined),
-        });
+        const tokens = stored[STORAGE_KEYS.tokens] as TokenData | undefined;
+        if (tokens?.refreshToken) setRefreshToken(tokens.refreshToken);
+
         setStatus({
           ...DEFAULT_STATUS,
-          ...(stored[STORAGE_KEYS.status] as Partial<PollStatus> | undefined),
+          ...(stored[STORAGE_KEYS.status] as Partial<AppStatus> | undefined),
         });
       });
 
-    const onChanged = (
-      changes: Record<string, { newValue?: unknown }>,
-      area: string,
-    ) => {
+    const onChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
       if (area !== 'local' || !changes[STORAGE_KEYS.status]) return;
       setStatus({
         ...DEFAULT_STATUS,
-        ...(changes[STORAGE_KEYS.status].newValue as Partial<PollStatus> | undefined),
+        ...(changes[STORAGE_KEYS.status].newValue as Partial<AppStatus> | undefined),
       });
     };
     browser.storage.onChanged.addListener(onChanged);
@@ -43,69 +60,76 @@ function App() {
   }, []);
 
   const handleSave = async () => {
-    await browser.storage.local.set({ [STORAGE_KEYS.settings]: settings });
+    const tokens: TokenData = { accessToken: '', refreshToken };
+    await browser.storage.local.set({ [STORAGE_KEYS.tokens]: tokens });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   };
 
+  const handleSendNow = async () => {
+    setSending(true);
+    try {
+      await browser.runtime.sendMessage({ type: 'SEND_NOW' });
+    } catch {
+      // status updates via storage.onChanged
+    }
+    setSending(false);
+  };
+
+  const sentToday = status.lastSentDate === todayString() && status.lastResult === 'success';
+  const inWindow = isInWindow();
+
   return (
     <main className="app">
-      <h1>Auto API Poller</h1>
-
-      <label className="field toggle">
-        <span>활성화</span>
-        <input
-          type="checkbox"
-          checked={settings.enabled}
-          onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
-        />
-      </label>
-
-      <label className="field">
-        <span>API URL</span>
-        <input
-          type="url"
-          placeholder="https://example.com/api"
-          value={settings.apiUrl}
-          onChange={(e) => setSettings({ ...settings, apiUrl: e.target.value })}
-        />
-      </label>
+      <h1>Floooding</h1>
 
       <label className="field">
         <span>리프레시 토큰</span>
         <input
           type="password"
           placeholder="리프레시 토큰을 입력하세요"
-          value={settings.refreshToken}
-          onChange={(e) => setSettings({ ...settings, refreshToken: e.target.value })}
+          value={refreshToken}
+          onChange={(e) => setRefreshToken(e.target.value)}
         />
       </label>
 
-      <label className="field">
-        <span>호출 간격 (분)</span>
-        <input
-          type="number"
-          min={1}
-          value={settings.intervalMinutes}
-          onChange={(e) =>
-            setSettings({ ...settings, intervalMinutes: Number(e.target.value) || 1 })
-          }
-        />
-      </label>
-
-      <button onClick={handleSave}>{saved ? '저장됨' : '저장'}</button>
+      <div className="row">
+        <button className="primary" onClick={handleSave} disabled={!refreshToken}>
+          {saved ? '저장됨' : '저장'}
+        </button>
+        <button onClick={handleSendNow} disabled={sending || !refreshToken}>
+          {sending ? '전송 중...' : '지금 전송'}
+        </button>
+      </div>
 
       <section className="status">
         <h2>상태</h2>
-        <p>
-          마지막 호출:{' '}
-          {status.lastRunAt ? new Date(status.lastRunAt).toLocaleString() : '없음'}
-        </p>
-        <p className={status.lastStatus === 'error' ? 'error' : ''}>
-          결과: {status.lastStatus ?? '-'}
-          {status.lastMessage && ` (${status.lastMessage})`}
-        </p>
+        <div>
+          오늘 전송:{' '}
+          <span className={`badge ${sentToday ? 'success' : 'pending'}`}>
+            {sentToday ? '완료' : '미완료'}
+          </span>
+        </div>
+        {status.lastSentAt && (
+          <div>마지막 시도: {new Date(status.lastSentAt).toLocaleString('ko-KR')}</div>
+        )}
+        {status.lastResult && (
+          <div>
+            결과:{' '}
+            <span className={`badge ${status.lastResult}`}>
+              {resultLabel(status.lastResult)}
+            </span>
+          </div>
+        )}
+        {status.lastMessage && <div className="msg">{status.lastMessage}</div>}
       </section>
+
+      <div className="window-info">
+        자동 전송: 20:10 ~ 21:00{' '}
+        <span className={`badge ${inWindow ? 'success' : 'pending'}`}>
+          {inWindow ? '활성' : '대기'}
+        </span>
+      </div>
     </main>
   );
 }

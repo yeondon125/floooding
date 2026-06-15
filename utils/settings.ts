@@ -1,30 +1,23 @@
-export interface PollSettings {
-  enabled: boolean;
-  apiUrl: string;
-  intervalMinutes: number;
+export interface TokenData {
+  accessToken: string;
   refreshToken: string;
 }
 
-export interface PollStatus {
-  lastRunAt: number | null;
-  lastStatus: 'success' | 'error' | null;
+export interface AppStatus {
+  lastSentAt: number | null;
+  lastSentDate: string | null; // "YYYY-MM-DD"
+  lastResult: 'success' | 'error' | 'token_expired' | null;
   lastMessage: string;
 }
 
-export const DEFAULT_SETTINGS: PollSettings = {
-  enabled: false,
-  apiUrl: '',
-  intervalMinutes: 1,
-  refreshToken: '',
-};
-
-export const DEFAULT_STATUS: PollStatus = {
-  lastRunAt: null,
-  lastStatus: null,
+export const DEFAULT_STATUS: AppStatus = {
+  lastSentAt: null,
+  lastSentDate: null,
+  lastResult: null,
   lastMessage: '',
 };
 
 export const STORAGE_KEYS = {
-  settings: 'pollSettings',
-  status: 'pollStatus',
+  tokens: 'tokens',
+  status: 'appStatus',
 } as const;
