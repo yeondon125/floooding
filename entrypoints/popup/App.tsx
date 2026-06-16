@@ -27,6 +27,7 @@ function isInWindow(): boolean {
 function resultLabel(result: AppStatus['lastResult']): string {
   if (!result) return '-';
   if (result === 'success') return '성공';
+  if (result === 'already_done') return '이미 신청됨';
   if (result === 'token_expired') return '토큰 만료';
   return '오류';
 }
@@ -98,7 +99,9 @@ function App() {
     await browser.storage.local.set({ [STORAGE_KEYS.massageStatus]: updated });
   };
 
-  const sentToday = status.lastSentDate === todayString() && status.lastResult === 'success';
+  const sentToday =
+    status.lastSentDate === todayString() &&
+    (status.lastResult === 'success' || status.lastResult === 'already_done');
   const inWindow = isInWindow();
   const massageAttemptedToday = massageStatus.lastAttemptDate === todayString();
 
@@ -169,14 +172,16 @@ function App() {
           <span
             className={`badge ${
               massageAttemptedToday
-                ? massageStatus.lastResult === 'success'
+                ? massageStatus.lastResult === 'success' ||
+                  massageStatus.lastResult === 'already_done'
                   ? 'success'
                   : 'error'
                 : 'pending'
             }`}
           >
             {massageAttemptedToday
-              ? massageStatus.lastResult === 'success'
+              ? massageStatus.lastResult === 'success' ||
+                massageStatus.lastResult === 'already_done'
                 ? '성공'
                 : '실패'
               : '미완료'}

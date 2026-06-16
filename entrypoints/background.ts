@@ -153,6 +153,16 @@ async function sendStudyRequest(manual = false): Promise<void> {
       res = await requestStudy(accessToken);
     }
 
+    if (res.status === 409) {
+      await setStatus({
+        lastSentAt: Date.now(),
+        lastSentDate: todayString(),
+        lastResult: 'already_done',
+        lastMessage: `HTTP 409 (이미 신청됨)`,
+      });
+      return;
+    }
+
     const ok = res.ok || res.status === 201;
     await setStatus({
       lastSentAt: Date.now(),
@@ -174,7 +184,12 @@ async function checkAndSend(): Promise<void> {
   if (!isInWindow()) return;
 
   const status = await getStatus();
-  if (status.lastSentDate === todayString() && status.lastResult === 'success') return;
+  if (
+    status.lastSentDate === todayString() &&
+    (status.lastResult === 'success' || status.lastResult === 'already_done')
+  ) {
+    return;
+  }
 
   await sendStudyRequest();
 }
@@ -209,6 +224,15 @@ async function sendMassageRequest(): Promise<void> {
       }
       accessToken = reissued.accessToken;
       res = await requestMassage(accessToken);
+    }
+
+    if (res.status === 409) {
+      await setMassageStatus({
+        lastSentAt: Date.now(),
+        lastResult: 'already_done',
+        lastMessage: `HTTP 409 (이미 신청됨)`,
+      });
+      return;
     }
 
     const ok = res.ok || res.status === 201;

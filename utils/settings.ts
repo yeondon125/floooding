@@ -6,7 +6,7 @@ export interface TokenData {
 export interface AppStatus {
   lastSentAt: number | null;
   lastSentDate: string | null; // "YYYY-MM-DD"
-  lastResult: 'success' | 'error' | 'token_expired' | null;
+  lastResult: 'success' | 'error' | 'token_expired' | 'already_done' | null;
   lastMessage: string;
 }
 
@@ -21,7 +21,7 @@ export interface MassageStatus {
   enabled: boolean;
   lastAttemptDate: string | null; // "YYYY-MM-DD" - set as soon as an attempt is made, success or not
   lastSentAt: number | null;
-  lastResult: 'success' | 'error' | 'token_expired' | null;
+  lastResult: 'success' | 'error' | 'token_expired' | 'already_done' | null;
   lastMessage: string;
 }
 
