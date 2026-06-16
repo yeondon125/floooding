@@ -158,7 +158,7 @@ function App() {
       </div>
 
       <section className="status">
-        <h2>마사지 자동 전송 (20:20:02)</h2>
+        <h2>마사지 자동 전송 (20:19:55)</h2>
         <label className="switch-row">
           <span>자동 전송 사용</span>
           <input

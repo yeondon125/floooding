@@ -18,8 +18,8 @@ const STUDY_MINUTE = 0;
 const STUDY_SECOND = 2; // 20:00:02
 
 const MASSAGE_HOUR = 20;
-const MASSAGE_MINUTE = 20;
-const MASSAGE_SECOND = 2; // 20:20:02
+const MASSAGE_MINUTE = 19;
+const MASSAGE_SECOND = 55; // 20:19:55
 
 function nowMinutes(): number {
   const d = new Date();
