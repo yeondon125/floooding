@@ -10,8 +10,12 @@ import {
 
 const BASE_URL = 'https://prod.flooding.kr';
 const ALARM_NAME = 'study-check';
-const WINDOW_START_MIN = 20 * 60 + 10; // 20:10
-const WINDOW_END_MIN = 21 * 60;        // 21:00
+const WINDOW_START_MIN = 20 * 60; // 20:00
+const WINDOW_END_MIN = 21 * 60;   // 21:00
+
+const STUDY_HOUR = 20;
+const STUDY_MINUTE = 0;
+const STUDY_SECOND = 2; // 20:00:02
 
 const MASSAGE_HOUR = 20;
 const MASSAGE_MINUTE = 20;
@@ -189,6 +193,16 @@ async function checkAndSend(): Promise<void> {
     (status.lastResult === 'success' || status.lastResult === 'already_done')
   ) {
     return;
+  }
+
+  const now = new Date();
+  if (now.getHours() === STUDY_HOUR && now.getMinutes() === STUDY_MINUTE) {
+    const msUntilTarget =
+      (STUDY_SECOND - now.getSeconds()) * 1000 - now.getMilliseconds();
+    if (msUntilTarget > 0) {
+      setTimeout(() => sendStudyRequest(), msUntilTarget);
+      return;
+    }
   }
 
   await sendStudyRequest();

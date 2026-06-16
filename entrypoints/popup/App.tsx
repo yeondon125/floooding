@@ -151,7 +151,7 @@ function App() {
       </section>
 
       <div className="window-info">
-        자동 전송: 20:10 ~ 21:00{' '}
+        자동 전송: 20:00:02 ~ 21:00{' '}
         <span className={`badge ${inWindow ? 'success' : 'pending'}`}>
           {inWindow ? '활성' : '대기'}
         </span>
